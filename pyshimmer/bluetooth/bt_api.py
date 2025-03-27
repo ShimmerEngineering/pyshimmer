@@ -25,14 +25,13 @@ from pyshimmer.bluetooth.bt_commands import GetShimmerHardwareVersion, ShimmerCo
     GetEXGRegsCommand, SetEXGRegsCommand, StartLoggingCommand, StopLoggingCommand, GetExperimentIDCommand, \
     SetExperimentIDCommand, GetDeviceNameCommand, SetDeviceNameCommand, DummyCommand, GetBatteryCommand, \
     SetSamplingRateCommand, SetSensorsCommand, SetStatusAckCommand, AllCalibration, GetAllCalibrationCommand
-from pyshimmer.bluetooth.bt_const import ACK_COMMAND_PROCESSED, DATA_PACKET, FULL_STATUS_RESPONSE, INSTREAM_CMD_RESPONSE
+from pyshimmer.bluetooth.bt_const import ACK_COMMAND_PROCESSED, DATA_PACKET, FULL_STATUS_RESPONSE, INSTREAM_CMD_RESPONSE, SHIMMER_VERSION_NAME_MAP
 from pyshimmer.bluetooth.bt_serial import BluetoothSerial
 from pyshimmer.dev.channels import ChDataTypeAssignment, ChannelDataType, EChannelType, ESensorGroup
 from pyshimmer.dev.exg import ExGRegister
 from pyshimmer.dev.fw_version import EFirmwareType, FirmwareVersion, FirmwareCapabilities
 from pyshimmer.serial_base import ReadAbort
 from pyshimmer.util import fmt_hex, PeekQueue
-
 
 class RequestCompletion:
     """
@@ -530,7 +529,7 @@ class ShimmerBluetooth:
         """
         self._process_and_wait(SetExperimentIDCommand(exp_id))
 
-    def get_inquiry(self) -> Tuple[float, int, List[EChannelType]]:
+    def get_inquiry(self, hw_type: int) -> Tuple[float, int, List[EChannelType]]:
         """Perform inquiry command
 
         :return: A tuple of 3 values:
@@ -538,7 +537,7 @@ class ShimmerBluetooth:
             - The buf size of the device
             - The active data channels of the device as list, does not include the TIMESTAMP channel
         """
-        return self._process_and_wait(InquiryCommand())
+        return self._process_and_wait(InquiryCommand(hw_type))
 
     def get_data_types(self):
         """Get the active data channels of the device
@@ -547,7 +546,7 @@ class ShimmerBluetooth:
 
         :return: A list of data channels, always containing the TIMESTAMP channel
         """
-        _, _, ctypes = self.get_inquiry()
+        _, _, ctypes = self.get_inquiry(SHIMMER_VERSION_NAME_MAP.get(self._hw_version))
         # The Timestamp is always present in data packets
         ctypes = [EChannelType.TIMESTAMP] + ctypes
 

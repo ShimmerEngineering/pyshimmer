@@ -141,9 +141,19 @@ BtChannelsByIndex = {
 """
 Different Device Types
 """
+
+SHIMMER1_HW_ID = 0;
+SHIMMER2_HW_ID = 1;
+SHIMMER2R_HW_ID = 2;
+SHIMMER3_HW_ID = 3;
+SHIMMER3R_HW_ID = 10;
+
 SHIMMER_VERSION_MAP = {
-        0: "SHIMMER1",
-        1: "SHIMMER2",
-        2: "SHIMMER2R",
-        3: "SHIMMER3",
-        10: "SHIMMER3R" }
+        SHIMMER1_HW_ID: "SHIMMER1",
+        SHIMMER2_HW_ID: "SHIMMER2",
+        SHIMMER2R_HW_ID: "SHIMMER2R",
+        SHIMMER3_HW_ID: "SHIMMER3",
+        SHIMMER3R_HW_ID: "SHIMMER3R" }
+
+# Reverse lookup dictionary
+SHIMMER_VERSION_NAME_MAP = {v: k for k, v in SHIMMER_VERSION_MAP.items()}

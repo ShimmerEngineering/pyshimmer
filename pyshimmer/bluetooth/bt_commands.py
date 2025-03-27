@@ -378,7 +378,8 @@ class InquiryCommand(ResponseCommand):
 
     """
 
-    def __init__(self):
+    def __init__(self, hw_type: int):
+        self._hw_type = hw_type
         super().__init__(INQUIRY_RESPONSE)
 
     @staticmethod
@@ -391,8 +392,13 @@ class InquiryCommand(ResponseCommand):
         ser.write_command(INQUIRY_COMMAND)
 
     def receive(self, ser: BluetoothSerial) -> any:
-        sr_val, _, n_ch, buf_size = ser.read_response(
+        if self._hw_type==SHIMMER3_HW_ID:
+            sr_val, _, n_ch, buf_size = ser.read_response(
             INQUIRY_RESPONSE, arg_format='<HIBB')
+        elif self._hw_type==SHIMMER3R_HW_ID:
+            sr_val, _, _, _, _, n_ch, buf_size = ser.read_response(
+            INQUIRY_RESPONSE, arg_format='<HIBBBBB')
+
         channel_conf = ser.read(n_ch)
 
         sr = dr2sr(sr_val)
