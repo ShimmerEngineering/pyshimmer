@@ -16,7 +16,8 @@
 from concurrent.futures import ThreadPoolExecutor, Future
 from typing import Optional, BinaryIO, List, Callable
 from unittest import TestCase
-
+import sys
+sys.path.append(r'C:\Github\pyshimmer')
 from pyshimmer.bluetooth.bt_api import BluetoothRequestHandler, ShimmerBluetooth
 from pyshimmer.bluetooth.bt_commands import GetDeviceNameCommand, SetDeviceNameCommand, DataPacket, GetStatusCommand, \
     GetStringCommand, ResponseCommand
