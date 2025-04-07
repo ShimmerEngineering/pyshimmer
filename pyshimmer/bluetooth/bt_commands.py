@@ -362,7 +362,10 @@ class GetAllCalibrationCommand(ResponseCommand):
         super().__init__(ALL_CALIBRATION_RESPONSE)
 
         self._offset = 0x0
-        self._rlen = 0x54  # 84 bytes
+        if hw_version == "SHIMMER3R":
+            self._rlen = 0x7E #126 bytes
+        else:
+            self._rlen = 0x54 # 84 bytes
         self.hw_version = hw_version
 
     def send(self, ser: BluetoothSerial) -> None:
