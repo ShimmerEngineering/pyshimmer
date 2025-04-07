@@ -346,7 +346,6 @@ class GetFirmwareVersionCommand(ResponseCommand):
 
 class GetAllCalibrationCommand(ResponseCommand):
     """ Returns all the stored calibration values (84 bytes) in the following order:
-
             ESensorGroup.ACCEL_LN (21 bytes)
             ESensorGroup.GYRO     (21 bytes)
             ESensorGroup.MAG      (21 bytes)
