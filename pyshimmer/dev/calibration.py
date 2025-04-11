@@ -16,22 +16,35 @@
 
 import struct
 from typing import List
+from pyshimmer.dev.fw_version import HardwareVersion
 
 from pyshimmer.util import fmt_hex
 
 
 class AllCalibration:
 
-    def __init__(self, reg_bin: bytes):
-        self._num_bytes = 84
+    def __init__(self, reg_bin: bytes, hw_version: HardwareVersion):
         self._sensor_bytes = 21
-        self._num_sensors = 4
+        self._num_sensors = self._get_num_sensors_from_hw(hw_version)
+        self._num_bytes = self._num_sensors * self._sensor_bytes
 
         if len(reg_bin) < self._num_bytes:
             raise ValueError(
                 f'All calibration data must have length {self._num_bytes}')
 
         self._reg_bin = reg_bin
+        
+    def _get_num_sensors_from_hw(self, hw_version: HardwareVersion) -> int:
+        version_map = {
+            HardwareVersion.SHIMMER1: 4,
+            HardwareVersion.SHIMMER2: 4,
+            HardwareVersion.SHIMMER2R: 4,
+            HardwareVersion.SHIMMER3: 4,
+            HardwareVersion.SHIMMER3R: 6
+        }
+        if hw_version not in version_map:
+            raise ValueError(f"Unsupported hardware version: {hw_version}")
+        return version_map[hw_version]
 
     def __str__(self) -> str:
         def print_sensor(sens_num: int) -> str:
