@@ -29,7 +29,7 @@ from pyshimmer.bluetooth.bt_const import ACK_COMMAND_PROCESSED, DATA_PACKET, FUL
 from pyshimmer.bluetooth.bt_serial import BluetoothSerial
 from pyshimmer.dev.channels import ChDataTypeAssignment, ChannelDataType, EChannelType, ESensorGroup
 from pyshimmer.dev.exg import ExGRegister
-from pyshimmer.dev.fw_version import EFirmwareType, FirmwareVersion, FirmwareCapabilities
+from pyshimmer.dev.fw_version import EFirmwareType, FirmwareVersion, FirmwareCapabilities, HardwareVersion
 from pyshimmer.serial_base import ReadAbort
 from pyshimmer.util import fmt_hex, PeekQueue
 
@@ -183,7 +183,6 @@ class BluetoothRequestHandler:
             cb(r)
 
     def _process_resp_from_queue(self):
-        
         cmd, return_obj = self._resp_queue.get_nowait()
 
         resp_code = cmd.get_response_code()
@@ -284,7 +283,7 @@ class ShimmerBluetooth:
 
         self._fw_version: Optional[FirmwareVersion] = None
         self._fw_caps: Optional[FirmwareCapabilities] = None
-        self._hw_version = None
+        self._hw_version: Optional[HardwareVersion] = None
 
     @property
     def initialized(self) -> bool:
@@ -313,12 +312,10 @@ class ShimmerBluetooth:
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.shutdown()
 
-    def _set_hw_capabilities(self) -> None:
-        self._hw_version = self.get_device_hardware_version()
-
     def _set_fw_capabilities(self) -> None:
         fw_type, fw_ver = self.get_firmware_version()
         self._fw_caps = FirmwareCapabilities(fw_type, fw_ver)
+        self._hw_version = self.get_device_hardware_version()
 
     def initialize(self) -> None:
         """Initialize the Bluetooth connection
@@ -327,7 +324,6 @@ class ShimmerBluetooth:
         optionally disables the status acknowledgment and starts the read loop.
         """
         self._thread.start()
-        self._set_hw_capabilities()
         self._set_fw_capabilities()
 
         if self.capabilities.supports_ack_disable and self._disable_ack:
@@ -484,7 +480,8 @@ class ShimmerBluetooth:
         """Gets all calibration data from sensor
         :return: An AllCalibration object that presents the calibration contents in an easily processable manner
         """
-        return self._process_and_wait(GetAllCalibrationCommand())
+        hw_version = self._process_and_wait(GetShimmerHardwareVersion())
+        return self._process_and_wait(GetAllCalibrationCommand(hw_version))
 
     def set_exg_register(self, chip_id: int, offset: int, data: bytes) -> None:
         """Configure part of the memory of the ExG registers
@@ -509,7 +506,7 @@ class ShimmerBluetooth:
         """
         self._process_and_wait(SetDeviceNameCommand(dev_name))
         
-    def get_device_hardware_version(self) -> any:
+    def get_device_hardware_version(self) -> HardwareVersion:
         """Retrieve the device hardware version
         
         :return: The device hardware version as string
