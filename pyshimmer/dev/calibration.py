@@ -87,6 +87,9 @@ class AllCalibration:
         end_offset = start_offset + 6
         ans = list(struct.unpack(
             '>hhh', self._reg_bin[start_offset:end_offset]))
+        
+        if sens_num == 1: # Scaling for Sensitivity (Gyroscope Only)
+            return [round(val /100.0, 2) for val in ans]
         return ans
 
     def get_ali_mat(self, sens_num: int) -> List[int]:
@@ -95,4 +98,7 @@ class AllCalibration:
         end_offset = start_offset + 9
         ans = list(struct.unpack(
             '>bbbbbbbbb', self._reg_bin[start_offset:end_offset]))
-        return ans
+        
+        # Scaling for Alignment 
+        return [round(val / 100.0, 2) for val in ans]
+    
