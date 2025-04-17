@@ -5,13 +5,28 @@ sys.path.append(r'C:\Users\Acer-User\git\pyshimmer')
 
 from serial import Serial
 from pyshimmer import ShimmerBluetooth, DEFAULT_BAUDRATE, DataPacket
+from pyshimmer.dev.channels import EChannelType
 
-def stream_cb(pkt: DataPacket) -> None:   
-    print(f'Received new data packet: ') 
-    for chan in pkt.channels:
-        print(f'channel: ' + str(chan)) 
-        print(f'value: ' + str(pkt[chan]))  
-    print('') 
+def make_stream_cb(alignment, sensitivity, offset):
+    def stream_cb(pkt: DataPacket) -> None:
+        print(f'\nReceived new data packet:')
+        raw_vector = []
+
+        for chan in pkt.channels:
+            print(f'channel: ' + str(chan)) 
+            print(f'value: ' + str(pkt[chan])) 
+
+        # Check Accel Channels
+        required_channels = [EChannelType.ACCEL_LN_X, EChannelType.ACCEL_LN_Y, EChannelType.ACCEL_LN_Z]
+        if all(ch in pkt.channels for ch in required_channels):
+            raw_vector = [pkt[ch] for ch in required_channels]
+            calibrated = calibrate_inertial_sensor_data(raw_vector, alignment, sensitivity, offset)
+            print(f"Uncalibrated values: ", raw_vector)
+            print(f"Calibrated values: ", calibrated)
+        else:
+            print("Channels not found")
+    
+    return stream_cb
 
 def calibrate_inertial_sensor_data(data, alignment, sensitivity, offset):
     """Applies calibration
@@ -91,19 +106,15 @@ def main(args=None):
     print("Alignment Matrix:")
     for row in alignment:
         print(" ", row)
-        
-    # Example raw accelerometer data (X, Y, Z)
-    raw_data = [100, 100, 100] # To-do (use stream data)
-    calibrated = calibrate_inertial_sensor_data(raw_data, alignment, sensitivity, offset)
-    
-    print("\nExample raw data:", raw_data)
-    print("Calibrated data (m/s^2 approx):", calibrated)
     
     # shim_dev.add_stream_callback(stream_cb)
+    
+    # Calibrated Stream Data
+    shim_dev.add_stream_callback(make_stream_cb(alignment, sensitivity, offset))
 
-    # shim_dev.start_streaming()
-    # time.sleep(0.5)
-    # shim_dev.stop_streaming()
+    shim_dev.start_streaming()
+    time.sleep(0.5)
+    shim_dev.stop_streaming()
 
     # shim_dev.shutdown()
 
