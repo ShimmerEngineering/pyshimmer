@@ -68,7 +68,7 @@ def calibrate_inertial_sensor_data(data, alignment, sensitivity, offset):
     
     # C = [R^(-1)] * [K^(-1)] * ([U] - [B])
     calibrated = am_inv @ sm_inv @ data_minus_offset
-    return calibrated.flatten().tolist()
+    return [round(val, 3) for val in calibrated.flatten().tolist()]
 
 def main(args=None):    
     # serial = Serial('COM5', DEFAULT_BAUDRATE)
