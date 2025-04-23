@@ -1,31 +1,77 @@
 import time
 import sys
 import numpy as np
+import matplotlib.pyplot as plt
+import collections
 sys.path.append(r'C:\Users\Acer-User\git\pyshimmer')
 
 from serial import Serial
 from pyshimmer import ShimmerBluetooth, DEFAULT_BAUDRATE, DataPacket
 from pyshimmer.dev.channels import EChannelType
+from matplotlib.animation import FuncAnimation
+from threading import Thread
 
-def make_stream_cb(alignment, sensitivity, offset):
+fig, axs = plt.subplots(4, 1, figsize=(10, 8), sharex=True)
+sensor_plot_order = ['ACCEL_LN', 'ACCEL_WR', 'GYRO', 'MAG']
+
+# Plot Buffers
+data_buffer = {sensor: {'X': collections.deque(maxlen=200),
+                        'Y': collections.deque(maxlen=200),
+                        'Z': collections.deque(maxlen=200)}
+               for sensor in sensor_plot_order}
+
+def init_plot():
+    for ax, sensor in zip(axs, sensor_plot_order):
+        ax.set_xlim(0, 200)
+        ax.set_ylim(-10, 15)
+        ax.set_title(f'{sensor} Calibrated Data')
+    return axs
+
+def update_plot(_):
+    for ax, sensor in zip(axs, sensor_plot_order):
+        ax.clear()
+        for axis in ['X', 'Y', 'Z']:
+            ax.plot(data_buffer[sensor][axis], label=f'{axis}')
+        ax.set_ylim(-10, 15)
+        ax.set_title(f'{sensor} Calibrated Data')
+        ax.legend()
+    return axs
+
+def make_stream_cb(calibration):
     def stream_cb(pkt: DataPacket) -> None:
-        print(f'\nReceived new data packet:')
-        raw_vector = []
+        
+        # print(f'received new data packet: ') 
+        # for chan in pkt.channels:
+        #     print(f'channel: ' + str(chan)) 
+        #     print(f'value: ' + str(pkt[chan]))     
+        # print('') 
 
-        for chan in pkt.channels:
-            print(f'channel: ' + str(chan)) 
-            print(f'value: ' + str(pkt[chan])) 
+        sensor_map = {
+            'ACCEL_LN': [EChannelType.ACCEL_LN_X, EChannelType.ACCEL_LN_Y, EChannelType.ACCEL_LN_Z],
+            'GYRO': [EChannelType.GYRO_MPU9150_X, EChannelType.GYRO_MPU9150_Y, EChannelType.GYRO_MPU9150_Z],
+            'MAG': [EChannelType.MAG_LSM303DLHC_X, EChannelType.MAG_LSM303DLHC_Y, EChannelType.MAG_LSM303DLHC_Z],
+            'ACCEL_WR': [EChannelType.ACCEL_LSM303DLHC_X, EChannelType.ACCEL_LSM303DLHC_Y, EChannelType.ACCEL_LSM303DLHC_Z],
+        }
 
-        # Check Accel Channels
-        required_channels = [EChannelType.ACCEL_LN_X, EChannelType.ACCEL_LN_Y, EChannelType.ACCEL_LN_Z]
-        if all(ch in pkt.channels for ch in required_channels):
-            raw_vector = [pkt[ch] for ch in required_channels]
-            calibrated = calibrate_inertial_sensor_data(raw_vector, alignment, sensitivity, offset)
-            print(f"Uncalibrated values: ", raw_vector)
-            print(f"Calibrated values: ", calibrated)
-        else:
-            print("Channels not found")
-    
+        for sensor_name, channels in sensor_map.items():
+            if all(ch in pkt.channels for ch in channels):
+                raw = [pkt[ch] for ch in channels]
+
+                idx = list(sensor_map).index(sensor_name)
+                offset = calibration.get_offset_bias(idx)
+                sensitivity = calibration.get_sensitivity(idx)
+                ali_raw = calibration.get_ali_mat(idx)
+                alignment = [[ali_raw[0], ali_raw[1], ali_raw[2]],
+                             [ali_raw[3], ali_raw[4], ali_raw[5]],
+                             [ali_raw[6], ali_raw[7], ali_raw[8]]]
+
+                calib = calibrate_inertial_sensor_data(raw, alignment, sensitivity, offset)
+                # print(f"{sensor_name} Calibrated Data: {calib}")
+
+                data_buffer[sensor_name]['X'].append(calib[0])
+                data_buffer[sensor_name]['Y'].append(calib[1])
+                data_buffer[sensor_name]['Z'].append(calib[2])
+        # print('') 
     return stream_cb
 
 def calibrate_inertial_sensor_data(data, alignment, sensitivity, offset):
@@ -92,29 +138,24 @@ def main(args=None):
     print(f'Number of Sensors: {calibration._num_sensors}')
     print(f'Number of Bytes: {calibration._num_bytes}')
     
-    # Example - Use first sensor LN_ACCEL (index 0)
-    sens_num = 0
-    offset = calibration.get_offset_bias(sens_num)
-    sensitivity = calibration.get_sensitivity(sens_num)
-    ali_raw = calibration.get_ali_mat(sens_num)
-    alignment = [[ali_raw[0], ali_raw[1], ali_raw[2]],
-                 [ali_raw[3], ali_raw[4], ali_raw[5]],
-                 [ali_raw[6], ali_raw[7], ali_raw[8]]]
-    
-    print("Offset Bias:", offset)
-    print("Sensitivity:", sensitivity)
-    print("Alignment Matrix:")
-    for row in alignment:
-        print(" ", row)
-    
-    # shim_dev.add_stream_callback(stream_cb)
-    
     # Calibrated Stream Data
-    shim_dev.add_stream_callback(make_stream_cb(alignment, sensitivity, offset))
+    shim_dev.add_stream_callback(make_stream_cb(calibration))
+    
+    def stream_thread():
+        shim_dev.start_streaming()
+        input('Streaming.. Press Enter to stop.\n')
+        shim_dev.stop_streaming()
+        shim_dev.shutdown()
+        
+    Thread(target=stream_thread, daemon=True).start()
+    
+    # Start real-time plotting
+    ani = FuncAnimation(fig, update_plot, init_func=init_plot, interval=100, blit=False)
+    plt.show()
 
-    shim_dev.start_streaming()
-    time.sleep(0.5)
-    shim_dev.stop_streaming()
+    # shim_dev.start_streaming()
+    # time.sleep(0.5)
+    # shim_dev.stop_streaming()
 
     # shim_dev.shutdown()
 
