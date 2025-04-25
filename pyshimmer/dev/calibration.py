@@ -16,22 +16,35 @@
 
 import struct
 from typing import List
+from pyshimmer.dev.fw_version import HardwareVersion
 
 from pyshimmer.util import fmt_hex
 
 
 class AllCalibration:
 
-    def __init__(self, reg_bin: bytes):
-        self._num_bytes = 84
+    def __init__(self, reg_bin: bytes, hw_version: HardwareVersion):
         self._sensor_bytes = 21
-        self._num_sensors = 4
+        self._num_sensors = self._get_num_sensors_from_hw(hw_version)
+        self._num_bytes = self._num_sensors * self._sensor_bytes
 
         if len(reg_bin) < self._num_bytes:
             raise ValueError(
                 f'All calibration data must have length {self._num_bytes}')
 
         self._reg_bin = reg_bin
+        
+    def _get_num_sensors_from_hw(self, hw_version: HardwareVersion) -> int:
+        version_map = {
+            HardwareVersion.SHIMMER1: 4,
+            HardwareVersion.SHIMMER2: 4,
+            HardwareVersion.SHIMMER2R: 4,
+            HardwareVersion.SHIMMER3: 4,
+            HardwareVersion.SHIMMER3R: 6
+        }
+        if hw_version not in version_map:
+            raise ValueError(f"Unsupported hardware version: {hw_version}")
+        return version_map[hw_version]
 
     def __str__(self) -> str:
         def print_sensor(sens_num: int) -> str:
@@ -74,6 +87,9 @@ class AllCalibration:
         end_offset = start_offset + 6
         ans = list(struct.unpack(
             '>hhh', self._reg_bin[start_offset:end_offset]))
+        
+        if sens_num == 1: # Scaling for Sensitivity (Gyroscope Only)
+            return [round(val /100.0, 2) for val in ans]
         return ans
 
     def get_ali_mat(self, sens_num: int) -> List[int]:
@@ -82,4 +98,7 @@ class AllCalibration:
         end_offset = start_offset + 9
         ans = list(struct.unpack(
             '>bbbbbbbbb', self._reg_bin[start_offset:end_offset]))
-        return ans
+        
+        # Scaling for Alignment 
+        return [round(val / 100.0, 2) for val in ans]
+    
