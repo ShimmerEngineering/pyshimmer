@@ -28,10 +28,12 @@ from pyshimmer.dev.channels import (
     EChannelType,
     ESensorGroup,
     sort_sensors,
+    sensors2bitfield,
+    bitfield2sensors,
 )
 
 
-class DeviceChannelsTest(TestCase):
+class EChannelTypeTest(TestCase):
 
     def test_channel_enum_uniqueness(self):
         try:
@@ -59,6 +61,26 @@ class DeviceChannelsTest(TestCase):
         with pytest.raises(ValueError):
             # Timestamp is not public
             EChannelType.enum_for_id(0x100)
+
+
+class ESensorGroupTest:
+
+    def test_sensor_group_uniqueness(self):
+        try:
+            # The exception will trigger upon import if the enum values are not unique
+            from pyshimmer.dev.channels import ESensorGroup
+        except ValueError as e:
+            pytest.fail(f"Enum not unique: {e}")
+
+
+class ChannelDataTypeTest(TestCase):
+
+    def test_ch_dtype_byte_order(self):
+        dtype = ChannelDataType(size=4, signed=True, le=True)
+        assert dtype.byte_order == "little"
+
+        dtype = ChannelDataType(size=4, signed=True, le=False)
+        assert dtype.byte_order == "big"
 
     def test_channel_data_type_decoding(self):
         def test_both_endianess(byte_val_le: bytes, expected: int, signed: bool):
@@ -119,6 +141,9 @@ class DeviceChannelsTest(TestCase):
         test_both_endianess(0x12345, 3, b"\x45\x23\x01", signed=False)
         test_both_endianess(-0x12345, 3, b"\xbb\xdc\xfe", signed=True)
 
+
+class ChannelFunctionsTest(TestCase):
+
     def test_get_ch_dtypes(self):
         channels = [EChannelType.INTERNAL_ADC_A1, EChannelType.GYRO_Y]
         r = get_ch_dtypes(channels)
@@ -134,13 +159,6 @@ class DeviceChannelsTest(TestCase):
         self.assertEqual(second.little_endian, False)
         self.assertEqual(second.signed, True)
 
-    def test_sensor_group_uniqueness(self):
-        try:
-            # The exception will trigger upon import if the enum values are not unique
-            from pyshimmer.dev.channels import ESensorGroup
-        except ValueError as e:
-            self.fail(f"Enum not unique: {e}")
-
     def test_datatype_assignments(self):
         from pyshimmer.dev.channels import EChannelType
 
@@ -154,6 +172,19 @@ class DeviceChannelsTest(TestCase):
         for sensor in ESensorGroup:
             if sensor not in SensorChannelAssignment:
                 self.fail(f"No channels assigned to sensor type: {sensor}")
+
+    def test_sensor_list_to_bitfield(self):
+        assert sensors2bitfield((ESensorGroup.ACCEL_LN, ESensorGroup.EXT_CH_A1)) == 0x81
+        assert sensors2bitfield((ESensorGroup.STRAIN, ESensorGroup.INT_CH_A1)) == 0x8100
+        assert sensors2bitfield((ESensorGroup.INT_CH_A2, ESensorGroup.TEMP)) == 0x820000
+
+    def test_bitfield_to_sensors(self):
+        assert bitfield2sensors(0x81) == [ESensorGroup.ACCEL_LN, ESensorGroup.EXT_CH_A1]
+        assert bitfield2sensors(0x8100) == [ESensorGroup.INT_CH_A1, ESensorGroup.STRAIN]
+        assert bitfield2sensors(0x820000) == [
+            ESensorGroup.INT_CH_A2,
+            ESensorGroup.TEMP,
+        ]
 
     def test_sensor_bit_assignments_uniqueness(self):
         for s1 in SensorBitAssignments.keys():
